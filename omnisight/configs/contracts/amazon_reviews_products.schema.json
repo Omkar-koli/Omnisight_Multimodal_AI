@@ -1,0 +1,14 @@
+{
+  "name": "amazon_reviews_products",
+  "primary_key": "product_id",
+  "columns": [
+    {"name": "product_id", "type": "string"},
+    {"name": "title", "type": "string"},
+    {"name": "brand", "type": "string"},
+    {"name": "price", "type": "float"},
+    {"name": "description", "type": "string"},
+    {"name": "category", "type": "string"},
+    {"name": "image_url", "type": "string"},
+    {"name": "source_system", "type": "string"}
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "entity_map",
+  "columns": [
+    {"name": "entity_id", "type": "string"},
+    {"name": "entity_name", "type": "string"},
+    {"name": "category", "type": "string"},
+    {"name": "amazon_product_id", "type": "string"},
+    {"name": "trend_keyword", "type": "string"},
+    {"name": "reddit_query", "type": "string"},
+    {"name": "uci_description", "type": "string"},
+    {"name": "match_score", "type": "float"},
+    {"name": "match_method", "type": "string"}
+  ]
+}

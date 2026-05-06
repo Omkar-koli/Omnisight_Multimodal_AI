@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: omnisight
+Version: 0.1.0
+Summary: OmniSight multimodal agentic RAG for e-commerce restocking
+Requires-Python: >=3.11

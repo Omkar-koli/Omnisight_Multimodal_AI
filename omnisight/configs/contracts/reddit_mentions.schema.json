@@ -1,0 +1,17 @@
+{
+  "name": "reddit_mentions",
+  "primary_key": "mention_id",
+  "columns": [
+    {"name": "mention_id", "type": "string"},
+    {"name": "query", "type": "string"},
+    {"name": "product_id", "type": "string"},
+    {"name": "subreddit", "type": "string"},
+    {"name": "title", "type": "string"},
+    {"name": "body", "type": "string"},
+    {"name": "score", "type": "int"},
+    {"name": "num_comments", "type": "int"},
+    {"name": "created_utc", "type": "datetime"},
+    {"name": "url", "type": "string"},
+    {"name": "source_system", "type": "string"}
+  ]
+}

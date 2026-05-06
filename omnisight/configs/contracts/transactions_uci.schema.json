@@ -1,0 +1,15 @@
+{
+  "name": "transactions_uci",
+  "columns": [
+    {"name": "invoice_no", "type": "string"},
+    {"name": "stock_code", "type": "string"},
+    {"name": "description", "type": "string"},
+    {"name": "quantity", "type": "float"},
+    {"name": "invoice_date", "type": "datetime"},
+    {"name": "unit_price", "type": "float"},
+    {"name": "customer_id", "type": "string"},
+    {"name": "country", "type": "string"},
+    {"name": "line_revenue", "type": "float"},
+    {"name": "source_system", "type": "string"}
+  ]
+}

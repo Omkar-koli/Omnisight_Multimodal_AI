@@ -1,0 +1,11 @@
+{
+  "name": "trends",
+  "columns": [
+    {"name": "trend_keyword", "type": "string"},
+    {"name": "product_id", "type": "string"},
+    {"name": "week", "type": "datetime"},
+    {"name": "trend_index", "type": "float"},
+    {"name": "trend_change_pct", "type": "float"},
+    {"name": "source_system", "type": "string"}
+  ]
+}
