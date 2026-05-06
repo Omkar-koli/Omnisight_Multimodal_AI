@@ -324,60 +324,113 @@ def summarize_grounded_context(
     }
 
 
-def build_chat_answer(
+def _format_recency_line(recency_days: int | None) -> str:
+    if recency_days is None:
+        return "Here’s what’s trending right now (trend data recency is unavailable)."
+
+    if recency_days > 7:
+        return (
+            f"Here’s what’s trending right now. Trend data is {recency_days} days old, "
+            f"so it may not reflect what is happening at this exact moment."
+        )
+
+    if recency_days == 0:
+        return "Here’s what’s trending right now (data is current as of today)."
+
+    if recency_days == 1:
+        return "Here’s what’s trending right now (data is current as of 1 day ago)."
+
+    return f"Here’s what’s trending right now (data is current as of {recency_days} days ago)."
+
+
+def render_trending_now_answer(context: dict) -> str:
+    products = context.get("products", []) or []
+    recency_days = context.get("recency_days", None)
+
+    intro = _format_recency_line(recency_days)
+
+    if not products:
+        return (
+            f"{intro}\n\n"
+            "I do not see any products clearly classified as Trending Up in the latest grounded data.\n\n"
+            "Would you like the full analysis for any specific product?"
+        )
+
+    lines = [intro, ""]
+    for i, product in enumerate(products, start=1):
+        title = str(product.get("title", "")).strip() or f"Product {i}"
+        trend_classification = str(product.get("trend_classification", "Stable")).strip()
+        keywords = product.get("keywords", []) or []
+        keywords_text = ", ".join([str(k).strip() for k in keywords[:3] if str(k).strip()])
+        if not keywords_text:
+            keywords_text = "no strong keyword signal available"
+
+        review_reason = str(product.get("review_reason", "")).strip()
+        if not review_reason:
+            review_reason = "Recent review behavior supports current momentum."
+
+        lines.append(
+            f"{i}. **{title}** - {trend_classification} - Keywords: {keywords_text} - {review_reason}"
+        )
+
+    lines.append("")
+    lines.append("Would you like the full analysis for any of these products?")
+    return "\n".join(lines)
+
+
+def render_trending_next_answer(context: dict) -> str:
+    candidates = context.get("candidates", []) or []
+
+    intro = (
+        "Here are the products that look most likely to trend next based on early signals in the data. "
+        "These are directional predictions, not certainties."
+    )
+
+    if not candidates:
+        return (
+            f"{intro}\n\n"
+            "I do not currently see enough aligned early signals to flag a strong next-wave candidate.\n\n"
+            "Want me to monitor these closely and alert you when the signal strengthens?"
+        )
+
+    lines = [intro, ""]
+    for i, product in enumerate(candidates, start=1):
+        title = str(product.get("title", "")).strip() or f"Product {i}"
+        confidence = str(product.get("confidence", "speculative")).strip().title()
+        early_signals = product.get("early_signals", []) or []
+        signals_text = "; ".join([str(s).strip() for s in early_signals if str(s).strip()])
+        if not signals_text:
+            signals_text = "Early signals are present but still thin."
+
+        watch_signal = str(product.get("watch_signal", "")).strip()
+        if not watch_signal:
+            watch_signal = "Watch whether demand strengthens over the next few weeks."
+
+        lines.append(
+            f"{i}. **{title}** - {confidence} Confidence - Signals: {signals_text} - "
+            f"Confidence: {confidence} - Watch Signal: {watch_signal}"
+        )
+
+    lines.append("")
+    lines.append("Want me to monitor these closely and alert you when the signal strengthens?")
+    return "\n".join(lines)
+
+
+def build_general_chat_answer(
     user_message: str,
-    intent: str,
     grounded_context: dict,
 ) -> str:
     client = make_chat_client()
     model = get_chat_model_name()
 
-    if intent == "trending_now":
-        system_prompt = """
-You are OmniSight Assistant answering a manager's question about what is trending right now.
-
-Rules:
-- Answer only from the grounded data context.
-- Return a ranked list of currently trending products.
-- For each product include:
-  1. product name
-  2. trending classification
-  3. top 2 or 3 keywords driving the trend
-  4. one short sentence explaining why it is trending based on recent reviews
-- Keep it short and scannable.
-- Always mention how recent the trend data is.
-- If recency_days is greater than 7, clearly warn that the data may be stale.
-- Do not include future predictions.
-- End with exactly one follow-up suggestion.
-"""
-
-    elif intent == "trending_next":
-        system_prompt = """
-You are OmniSight Assistant answering a manager's forward-looking question about what may trend next.
-
-Rules:
-- Answer only from the grounded data context.
-- Do not present any prediction as certain.
-- For each product include:
-  1. product name
-  2. the early signals you spotted
-  3. the timeline of those signals when available
-  4. a confidence level: speculative, moderate, or high
-  5. one watch signal that would confirm or deny the prediction
-- Be honest if the signal is thin.
-- Keep it concise and business-facing.
-- Do not mix this with a "trending now" answer unless the user asked for both.
-- End with exactly one follow-up suggestion.
-"""
-
-    else:
-        system_prompt = """
+    system_prompt = """
 You are OmniSight Assistant, a grounded inventory analysis copilot.
 
 Rules:
 - Answer only from the provided grounded context.
 - Do not invent products, counts, categories, or metrics.
-- Be concise, practical, and business-facing.
+- Keep the answer concise and easy to scan.
+- Prefer short paragraphs or short bullet-like lines.
 - End with exactly one follow-up suggestion.
 """
 
@@ -401,6 +454,22 @@ Return plain text only.
     )
 
     return (response.choices[0].message.content or "").strip()
+
+def build_chat_answer(
+    user_message: str,
+    intent: str,
+    grounded_context: dict,
+) -> str:
+    if intent == "trending_now":
+        return render_trending_now_answer(grounded_context)
+
+    if intent == "trending_next":
+        return render_trending_next_answer(grounded_context)
+
+    return build_general_chat_answer(
+        user_message=user_message,
+        grounded_context=grounded_context,
+    )
 
 def load_decision_features_df() -> pd.DataFrame:
     df = _read_parquet(DECISION_FEATURES_PATH)
@@ -579,11 +648,9 @@ def build_trending_now_context() -> dict:
             related_df=related_df,
         )
 
-        review_reason = str(
-            row.get("confidence_notes")
-            or row.get("executive_summary")
-            or "Recent review patterns support current momentum."
-        )
+        review_reason = str(row.get("executive_summary", "")).strip()
+        if not review_reason:
+            review_reason = "Recent reviews suggest positive momentum around this product."
 
         products.append(
             {
@@ -873,12 +940,6 @@ async def get_product_analysis(product_id: str) -> ProductAnalysisResponse:
     )
 
 
-@router.get(
-    "/categories/summary",
-    response_model=CategorySummaryResponse,
-    tags=["products"],
-    dependencies=[Depends(require_internal_token)],
-)
 @router.get(
     "/categories/summary",
     response_model=CategorySummaryResponse,
