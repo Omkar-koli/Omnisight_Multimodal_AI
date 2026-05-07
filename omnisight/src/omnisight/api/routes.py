@@ -50,6 +50,9 @@ from omnisight.api.schemas import (
     Top5ProductListResponse,
     AssistantChatRequest,
     AssistantChatResponse,
+    AlertItem,
+    AlertListResponse,
+    AlertSummaryResponse,
 )
 from omnisight.api.security import require_internal_token
 from omnisight.db.job_store import init_job_db, list_freshness, list_job_runs
@@ -248,6 +251,192 @@ def infer_trend_strength(row: pd.Series) -> float:
     if trend_classification == "Trending Down":
         return 0.20
     return 0.50
+
+def build_alert_rows() -> list[dict]:
+    alerts: list[dict] = []
+
+    try:
+        analysis_df = load_analysis_df()
+    except Exception:
+        analysis_df = pd.DataFrame()
+
+    try:
+        source_df = load_source_health_df()
+    except Exception:
+        source_df = pd.DataFrame()
+
+    if not analysis_df.empty:
+        for _, row in analysis_df.iterrows():
+            product_id = str(row.get("product_id", "") or "")
+            title = str(row.get("title", "") or "").strip()
+            category_slug = str(row.get("category_slug", "") or "")
+            stock_flag = str(row.get("stock_flag", "") or "")
+            trend_classification = str(row.get("trend_classification", "") or "")
+            confidence_pct = safe_float(row.get("confidence_pct", 0.0), 0.0)
+            manual_review_required = bool(row.get("manual_review_required", False))
+            current_quantity = safe_float(row.get("current_quantity", 0.0), 0.0)
+            threshold_units = safe_float(row.get("threshold_units", 0.0), 0.0)
+            recommended_order_qty = safe_float(row.get("recommended_order_qty", 0.0), 0.0)
+
+            if stock_flag == "CRITICAL":
+                alerts.append(
+                    {
+                        "alert_id": f"critical-stock-{product_id}",
+                        "severity": "critical",
+                        "alert_type": "critical_stock",
+                        "title": f"Critical stock: {title}",
+                        "message": (
+                            f"{title} is in CRITICAL stock status. "
+                            f"Current quantity is {current_quantity:.0f} against a threshold of {threshold_units:.0f}."
+                        ),
+                        "product_id": product_id,
+                        "category_slug": category_slug,
+                        "source_name": "",
+                        "created_from": "analysis",
+                        "metric_value": current_quantity,
+                    }
+                )
+
+            elif stock_flag == "LOW STOCK":
+                alerts.append(
+                    {
+                        "alert_id": f"low-stock-{product_id}",
+                        "severity": "warning",
+                        "alert_type": "low_stock",
+                        "title": f"Low stock: {title}",
+                        "message": (
+                            f"{title} is below threshold and may need replenishment soon. "
+                            f"Recommended order quantity is {recommended_order_qty:.0f}."
+                        ),
+                        "product_id": product_id,
+                        "category_slug": category_slug,
+                        "source_name": "",
+                        "created_from": "analysis",
+                        "metric_value": recommended_order_qty,
+                    }
+                )
+
+            if stock_flag == "OVERSTOCK":
+                alerts.append(
+                    {
+                        "alert_id": f"overstock-{product_id}",
+                        "severity": "warning",
+                        "alert_type": "overstock",
+                        "title": f"Overstock risk: {title}",
+                        "message": (
+                            f"{title} is overstocked relative to threshold. "
+                            f"Current quantity is {current_quantity:.0f} vs threshold {threshold_units:.0f}."
+                        ),
+                        "product_id": product_id,
+                        "category_slug": category_slug,
+                        "source_name": "",
+                        "created_from": "analysis",
+                        "metric_value": current_quantity - threshold_units,
+                    }
+                )
+
+            if trend_classification == "Trending Down" and stock_flag in {"OVERSTOCK", "SUFFICIENT"}:
+                alerts.append(
+                    {
+                        "alert_id": f"trend-drop-{product_id}",
+                        "severity": "warning",
+                        "alert_type": "trend_drop",
+                        "title": f"Trend drop: {title}",
+                        "message": (
+                            f"{title} is trending down. Inventory should be watched closely to avoid excess stock."
+                        ),
+                        "product_id": product_id,
+                        "category_slug": category_slug,
+                        "source_name": "",
+                        "created_from": "analysis",
+                        "metric_value": 0.0,
+                    }
+                )
+
+            if manual_review_required or confidence_pct < 60:
+                alerts.append(
+                    {
+                        "alert_id": f"low-confidence-{product_id}",
+                        "severity": "info" if confidence_pct >= 50 else "warning",
+                        "alert_type": "low_confidence",
+                        "title": f"Low-confidence recommendation: {title}",
+                        "message": (
+                            f"{title} has a recommendation confidence of {confidence_pct:.0f}%. "
+                            f"A human review may be useful before acting."
+                        ),
+                        "product_id": product_id,
+                        "category_slug": category_slug,
+                        "source_name": "",
+                        "created_from": "analysis",
+                        "metric_value": confidence_pct,
+                    }
+                )
+
+    if not source_df.empty:
+        for _, row in source_df.iterrows():
+            source_name = str(row.get("source_name", "") or "")
+            status = str(row.get("status", "") or "").lower()
+            is_stale = bool(row.get("is_stale", False))
+            stale_reason = str(row.get("stale_reason", "") or "").strip()
+            row_count = int(safe_float(row.get("row_count", 0), 0))
+
+            if is_stale:
+                alerts.append(
+                    {
+                        "alert_id": f"stale-source-{source_name}",
+                        "severity": "critical",
+                        "alert_type": "stale_source",
+                        "title": f"Stale source: {source_name}",
+                        "message": stale_reason or f"{source_name} is stale and may be impacting freshness.",
+                        "product_id": "",
+                        "category_slug": "",
+                        "source_name": source_name,
+                        "created_from": "source_health",
+                        "metric_value": float(row_count),
+                    }
+                )
+
+            elif status == "empty":
+                alerts.append(
+                    {
+                        "alert_id": f"empty-source-{source_name}",
+                        "severity": "warning",
+                        "alert_type": "empty_source",
+                        "title": f"Empty source: {source_name}",
+                        "message": f"{source_name} returned no usable rows in the latest refresh.",
+                        "product_id": "",
+                        "category_slug": "",
+                        "source_name": source_name,
+                        "created_from": "source_health",
+                        "metric_value": float(row_count),
+                    }
+                )
+
+    severity_order = {"critical": 3, "warning": 2, "info": 1}
+    alerts = sorted(
+        alerts,
+        key=lambda x: (
+            severity_order.get(str(x.get("severity", "info")), 0),
+            safe_float(x.get("metric_value", 0.0), 0.0),
+        ),
+        reverse=True,
+    )
+
+    return alerts
+
+
+def build_alert_summary(alerts: list[dict]) -> dict:
+    critical_count = sum(1 for a in alerts if a.get("severity") == "critical")
+    warning_count = sum(1 for a in alerts if a.get("severity") == "warning")
+    info_count = sum(1 for a in alerts if a.get("severity") == "info")
+
+    return {
+        "total_alerts": len(alerts),
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+        "info_count": info_count,
+    }
+
 
 def make_chat_client() -> OpenAI:
     base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1").strip()
@@ -1344,6 +1533,36 @@ async def get_decisions_over_time(days: int = Query(default=14, ge=1, le=90)) ->
 async def get_override_breakdown() -> OverrideBreakdownResponse:
     rows = override_breakdown()
     return OverrideBreakdownResponse(items=[OverrideBreakdownItem(**row) for row in rows])
+
+@router.get(
+    "/alerts/list",
+    response_model=AlertListResponse,
+    tags=["alerts"],
+    dependencies=[Depends(require_internal_token)],
+)
+async def get_alert_list(
+    severity: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+) -> AlertListResponse:
+    alerts = build_alert_rows()
+
+    if severity:
+        alerts = [a for a in alerts if str(a.get("severity", "")) == severity]
+
+    alerts = alerts[:limit]
+    return AlertListResponse(items=[AlertItem(**a) for a in alerts])
+
+
+@router.get(
+    "/alerts/summary",
+    response_model=AlertSummaryResponse,
+    tags=["alerts"],
+    dependencies=[Depends(require_internal_token)],
+)
+async def get_alert_summary() -> AlertSummaryResponse:
+    alerts = build_alert_rows()
+    return AlertSummaryResponse(**build_alert_summary(alerts))
+
 
 
 # -----------------------------

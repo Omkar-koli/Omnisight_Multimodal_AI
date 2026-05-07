@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import math
 import pandas as pd
+from typing import Any, Dict
 
 from omnisight.features.demand_features import build_decision_features
 
@@ -62,6 +63,63 @@ def build_trend_series(
 
 def deterministic_int_from_product_id(product_id: str) -> int:
     return sum(ord(ch) for ch in str(product_id))
+
+def normalize_text_list(value) -> list[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    if isinstance(value, tuple):
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    if hasattr(value, "tolist"):
+        raw = value.tolist()
+        if isinstance(raw, list):
+            return [str(v).strip() for v in raw if str(v).strip()]
+        raw = str(raw).strip()
+        return [raw] if raw else []
+
+    text = str(value).strip()
+    if not text:
+        return []
+
+    # split common delimiters if present
+    for delim in ["|", ";", "\n", ","]:
+        if delim in text:
+            return [part.strip() for part in text.split(delim) if part.strip()]
+
+    return [text]
+
+def first_nonempty_text_list(row: Dict[str, Any], candidate_keys: list[str]) -> list[str]:
+    for key in candidate_keys:
+        values = normalize_text_list(row.get(key))
+        if len(values) > 0:
+            return values
+    return []
+
+def dedupe_keep_order(values: list[str]) -> list[str]:
+    seen = set()
+    out: list[str] = []
+    for value in values:
+        key = value.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(value.strip())
+    return out
+
+
+def collect_first_available_terms(row: pd.Series, candidate_cols: list[str], limit: int = 5) -> list[str]:
+    collected: list[str] = []
+
+    for col in candidate_cols:
+        if col not in row.index:
+            continue
+        collected.extend(normalize_text_list(row.get(col)))
+
+    return dedupe_keep_order(collected)[:limit]
 
 
 def looks_like_placeholder_inventory(df: pd.DataFrame) -> bool:
@@ -309,6 +367,58 @@ def main() -> None:
         lambda row: 2
         if float(row.get("days_to_stockout", 999.0) or 999.0) <= 14
         else (1 if float(row.get("days_to_stockout", 999.0) or 999.0) <= 28 else 0),
+        axis=1,
+    )
+
+        # -----------------------------
+    # Text evidence for trend explanations
+    # -----------------------------
+    # These columns are optional. If upstream data contains them, preserve and normalize them.
+    # If not present, they stay empty and downstream logic should mark trend reasoning as low confidence.
+
+    decision_df["trend_search_keywords"] = decision_df.apply(
+        lambda row: collect_first_available_terms(
+            row,
+            [
+                "trend_search_keywords",
+                "google_trends_keywords",
+                "trend_keywords",
+                "related_queries_top",
+                "related_query_terms",
+                "trend_keyword",
+            ],
+            limit=5,
+        ),
+        axis=1,
+    )
+
+    decision_df["recent_review_keywords_30d"] = decision_df.apply(
+        lambda row: collect_first_available_terms(
+            row,
+            [
+                "recent_review_keywords_30d",
+                "recent_review_title_keywords",
+                "recent_review_phrases_30d",
+                "review_title_keywords_30d",
+                "review_keywords",
+            ],
+            limit=5,
+        ),
+        axis=1,
+    )
+
+    decision_df["recent_review_titles_30d"] = decision_df.apply(
+        lambda row: collect_first_available_terms(
+            row,
+            [
+                "recent_review_titles_30d",
+                "recent_review_headlines_30d",
+                "review_titles_30d",
+                "review_headlines",
+                "recent_review_titles",
+            ],
+            limit=10,
+        ),
         axis=1,
     )
 

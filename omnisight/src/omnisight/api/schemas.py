@@ -339,3 +339,26 @@ class AssistantChatResponse(BaseModel):
     answer: str
     suggestions: List[str] = []
     referenced_product_ids: List[str] = []
+
+class AlertItem(BaseModel):
+    alert_id: str
+    severity: Literal["critical", "warning", "info"]
+    alert_type: str
+    title: str
+    message: str
+    product_id: str = ""
+    category_slug: str = ""
+    source_name: str = ""
+    created_from: str = ""
+    metric_value: float = 0.0
+
+
+class AlertListResponse(BaseModel):
+    items: List[AlertItem]
+
+
+class AlertSummaryResponse(BaseModel):
+    total_alerts: int
+    critical_count: int
+    warning_count: int
+    info_count: int

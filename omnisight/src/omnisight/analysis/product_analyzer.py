@@ -41,6 +41,133 @@ def recent_avg(values: list[float], n: int) -> float:
     vals = vals[-n:]
     return sum(vals) / len(vals)
 
+def normalize_text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    if isinstance(value, tuple):
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    if hasattr(value, "tolist"):
+        raw = value.tolist()
+        if isinstance(raw, list):
+            return [str(v).strip() for v in raw if str(v).strip()]
+        raw = str(raw).strip()
+        return [raw] if raw else []
+
+    text = str(value).strip()
+    return [text] if text else []
+
+def first_nonempty_text_list(row: Dict[str, Any], candidate_keys: list[str]) -> list[str]:
+    for key in candidate_keys:
+        values = normalize_text_list(row.get(key))
+        if len(values) > 0:
+            return values
+    return []
+
+def dedupe_keep_order(values: list[str]) -> list[str]:
+    seen = set()
+    out: list[str] = []
+    for value in values:
+        key = value.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(value.strip())
+    return out
+
+
+def build_trending_reason_block(
+    row: Dict[str, Any],
+    trend_classification: str,
+    recent_review_avg: float,
+    older_review_avg: float,
+    recent_review_count: int,
+    older_review_count: int,
+) -> tuple[list[str], list[str], str]:
+    """
+    Returns:
+      trend_keywords,
+      trend_reasons,
+      trend_reason_confidence
+    """
+
+    if trend_classification != "Trending Up":
+        return [], [], "not_applicable"
+
+    trend_keywords = first_nonempty_text_list(
+    row,
+    [
+        "trend_search_keywords",
+        "related_queries_top",
+        "google_trends_keywords",
+        "trend_keywords",
+    ],
+)
+
+    review_terms = first_nonempty_text_list(
+    row,
+    [
+        "recent_review_keywords_30d",
+        "recent_review_title_keywords",
+        "recent_review_phrases_30d",
+    ],
+)
+
+    review_titles = first_nonempty_text_list(
+    row,
+    [
+        "recent_review_titles_30d",
+        "recent_review_headlines_30d",
+    ],
+)
+
+    keywords = dedupe_keep_order(trend_keywords + review_terms)
+    keywords = keywords[:5]
+
+    reasons: list[str] = []
+
+    if keywords:
+        reasons.append(
+            f"Search interest is being driven by terms such as {', '.join(keywords[:3])}."
+        )
+
+    if recent_review_count >= 3 and review_terms:
+        reasons.append(
+            f"Recent reviews repeatedly mention {', '.join(review_terms[:3])}, which aligns with the current demand lift."
+        )
+    elif recent_review_count >= 3 and review_titles:
+        reasons.append(
+            "Recent review titles show repeated buyer interest in the same product benefits over the last 30 days."
+        )
+
+    if recent_review_avg >= older_review_avg + 0.18:
+        reasons.append(
+            "Review sentiment improved versus the prior period, suggesting stronger current buyer response."
+        )
+
+    if recent_review_count > older_review_count and recent_review_count >= 3:
+        reasons.append(
+            "Review activity is higher in the last 30 days than the earlier period, indicating more recent attention."
+        )
+
+    reasons = dedupe_keep_order(reasons)[:3]
+
+    if recent_review_count < 3 and len(keywords) < 2:
+        confidence = "low"
+        if not reasons:
+            reasons = [
+                "Recent reviews are too few or too old to explain the trend reliably."
+            ]
+    elif recent_review_count < 5 or len(keywords) < 3:
+        confidence = "moderate"
+    else:
+        confidence = "high"
+
+    return keywords, reasons, confidence
 
 def classify_trend(
     trend_values: list[float],
@@ -335,6 +462,15 @@ def analyze_product(row: Dict[str, Any]) -> ProductAnalysis:
     recommended_order_qty=recommended_order_qty,
     trend_classification=trend_classification,
     )
+    trend_keywords, trend_reasons, trend_reason_confidence = build_trending_reason_block(
+        row=row,
+        trend_classification=trend_classification,
+        recent_review_avg=recent_review_avg,
+        older_review_avg=older_review_avg,
+        recent_review_count=recent_review_count,
+        older_review_count=older_review_count,
+    )
+    
 
     urgency_rank_score = 0.0
     if stock_flag == "CRITICAL":
@@ -360,6 +496,7 @@ def analyze_product(row: Dict[str, Any]) -> ProductAnalysis:
         confidence_pct=confidence_pct,
         caveat=confidence_notes,
     )
+    
 
     return ProductAnalysis(
         product_id=str(row.get("product_id", "")),
@@ -383,4 +520,7 @@ def analyze_product(row: Dict[str, Any]) -> ProductAnalysis:
         executive_summary=executive_summary,
         urgency_rank_score=urgency_rank_score,
         destination_view="monitoring",
+        trend_keywords=trend_keywords,
+        trend_reasons=trend_reasons,
+        trend_reason_confidence=trend_reason_confidence,
     )

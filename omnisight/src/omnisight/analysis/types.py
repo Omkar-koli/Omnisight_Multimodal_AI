@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 
 TrendClass = Literal["Trending Up", "Trending Down", "Stable"]
-StockFlag = Literal["CRITICAL", "LOW STOCK", "SUFFICIENT"]
+StockFlag = Literal["CRITICAL", "LOW STOCK", "SUFFICIENT", "OVERSTOCK"]
 ViewName = Literal["dashboard", "monitoring"]
 
 
@@ -37,5 +37,9 @@ class ProductAnalysis:
 
     executive_summary: str
 
-    urgency_rank_score: float
-    destination_view: ViewName
+    trend_keywords: list[str] = field(default_factory=list)
+    trend_reasons: list[str] = field(default_factory=list)
+    trend_reason_confidence: str = "not_applicable"
+
+    urgency_rank_score: float = 0.0
+    destination_view: ViewName = "monitoring"
