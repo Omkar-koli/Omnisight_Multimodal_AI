@@ -239,6 +239,9 @@ class Top5ProductItem(BaseModel):
     recommended_order_qty: float = 0.0
     confidence_pct: float = 0.0
     executive_summary: str = ""
+    trend_keywords: List[str] = []
+    trend_reasons: List[str] = []
+    trend_reason_confidence: str = "not_applicable"
 
 
 class Top5ProductListResponse(BaseModel):
@@ -275,6 +278,9 @@ class ProductAnalysisResponse(BaseModel):
     trend_classification: Literal["Trending Up", "Trending Down", "Stable"]
     trend_conflict: bool = False
     trend_summary: str = ""
+    trend_keywords: List[str] = []
+    trend_reasons: List[str] = []
+    trend_reason_confidence: str = "not_applicable"
 
     projected_weekly_demand: float = 0.0
     threshold_units: float = 0.0
