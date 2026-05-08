@@ -31,14 +31,42 @@ export function BarMetricChart({
   }
 
   return (
-    <div className="h-[320px] w-full min-w-0">
+    <div className="h-[300px] w-full min-w-0">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
-          <CartesianGrid vertical={false} />
-          <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Bar dataKey={barKey} radius={[8, 8, 0, 0]} />
+        <BarChart
+          data={data}
+          margin={{ top: 8, right: 12, left: -8, bottom: 8 }}
+        >
+          <CartesianGrid
+            vertical={false}
+            stroke="var(--border)"
+            strokeDasharray="3 3"
+          />
+          <XAxis
+            dataKey={xKey}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
+          />
+          <YAxis
+            allowDecimals={false}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "var(--popover)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              fontSize: "12px",
+            }}
+            cursor={{ fill: "var(--muted)" }}
+          />
+          <Bar
+            dataKey={barKey}
+            fill="var(--chart-1)"
+            radius={[6, 6, 0, 0]}
+            maxBarSize={56}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

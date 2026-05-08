@@ -21,6 +21,7 @@ export function MetricCard({
 }) {
   const TrendIcon =
     trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
+
   const trendColor =
     trend === "up"
       ? "text-emerald-600 dark:text-emerald-400"
@@ -31,27 +32,23 @@ export function MetricCard({
   return (
     <Card
       className={cn(
-        "rounded-2xl relative overflow-hidden border transition-shadow hover:shadow-md",
-        accent && "border-primary/30"
+        "rounded-xl relative overflow-hidden border bg-card transition-shadow hover:shadow-sm",
+        accent && "border-primary/40"
       )}
     >
-      {/* Indigo accent stripe on top */}
-      <div
-        className={cn(
-          "absolute inset-x-0 top-0 h-0.5 rounded-t-2xl",
-          accent ? "bg-primary" : "bg-primary/25"
-        )}
-      />
+      {accent ? (
+        <div className="absolute inset-y-0 left-0 w-0.5 bg-primary" />
+      ) : null}
 
-      <CardContent className="pt-5 pb-4 px-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <CardContent className="px-4 py-3.5">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           {title}
         </div>
-        <div className="mt-1.5 text-2xl font-bold text-foreground tabular-nums">
+        <div className="mt-1.5 text-2xl font-semibold tabular-nums text-foreground">
           {value}
         </div>
         {(subtitle || delta) && (
-          <div className="mt-1.5 flex items-center gap-1.5">
+          <div className="mt-1 flex items-center gap-1.5">
             {trend && (
               <TrendIcon className={cn("h-3 w-3 shrink-0", trendColor)} />
             )}

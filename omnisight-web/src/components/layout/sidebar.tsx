@@ -36,28 +36,27 @@ export function Sidebar({ onClose, isMobile }: SidebarProps) {
 
   return (
     <aside className="flex h-full flex-col bg-sidebar border-r border-sidebar-border">
-      {/* Brand Header */}
+      {/* Brand */}
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary shadow-sm">
-            <Boxes className="h-4 w-4 text-primary-foreground" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background">
+            <Boxes className="h-4 w-4" />
           </div>
           <div className="leading-tight">
-            <div className="text-sm font-bold tracking-tight text-sidebar-foreground">
+            <div className="text-sm font-semibold tracking-tight text-sidebar-foreground">
               OmniSight
             </div>
-            <div className="text-[10px] text-muted-foreground">
-              Intelligence Platform
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Decision Intelligence
             </div>
           </div>
         </div>
 
-        {/* Close button — mobile only */}
         {isMobile && onClose ? (
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             aria-label="Close menu"
           >
             <X className="h-4 w-4" />
@@ -66,50 +65,48 @@ export function Sidebar({ onClose, isMobile }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        <div className="mb-2 mt-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Main Menu
+      <nav className="flex-1 overflow-y-auto p-3">
+        <div className="mb-2 mt-1 px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+          Workspace
         </div>
 
-        {navItems.map(({ href, icon: Icon, label }) => {
-          const active = isActive(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
-                active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}
-            >
-              <Icon
+        <div className="space-y-0.5">
+          {navItems.map(({ href, icon: Icon, label }) => {
+            const active = isActive(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onClose}
                 className={cn(
-                  "h-4 w-4 shrink-0 transition-transform duration-150 group-hover:scale-110",
-                  active ? "text-primary-foreground" : ""
+                  "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-foreground/95 text-background"
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                 )}
-              />
-              <span className="flex-1">{label}</span>
-              {active && (
-                <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground/60" />
-              )}
-            </Link>
-          );
-        })}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1">{label}</span>
+                {active ? (
+                  <span className="h-1 w-1 rounded-full bg-primary" />
+                ) : null}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
-      {/* Footer badge */}
+      {/* Footer */}
       <div className="border-t border-sidebar-border p-4">
-        <div className="rounded-xl bg-primary/8 border border-primary/15 px-3 py-2.5">
-          <div className="text-xs font-semibold text-foreground">OmniSight v2</div>
-          <div className="mt-0.5 text-[10px] text-muted-foreground">
-            Multimodal AI · Qdrant · Ollama
+        <div className="rounded-md border bg-card px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary pulse-dot" />
+            <span className="text-[11px] font-medium text-foreground">
+              OmniSight v2
+            </span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[10px] text-emerald-600 font-medium">All systems operational</span>
+          <div className="mt-1 text-[10px] text-muted-foreground">
+            Multimodal · Qdrant · Ollama
           </div>
         </div>
       </div>

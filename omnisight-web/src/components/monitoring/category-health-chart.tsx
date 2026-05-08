@@ -25,33 +25,67 @@ export function CategoryHealthChart({
 }) {
   if (!data.length) {
     return (
-      <div className="text-sm text-muted-foreground">
+      <div className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
         No category chart data available.
       </div>
     );
   }
 
   return (
-    <div className="h-[340px] w-full">
+    <div className="h-[320px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
-          margin={{ top: 12, right: 16, left: 0, bottom: 16 }}
+          margin={{ top: 8, right: 12, left: -8, bottom: 16 }}
         >
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="var(--border)"
+            vertical={false}
+          />
           <XAxis
             dataKey="name"
             angle={-15}
             textAnchor="end"
-            height={60}
+            height={56}
             interval={0}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
           />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="critical" stackId="a" fill="#ef4444" name="Critical" />
-          <Bar dataKey="low_stock" stackId="a" fill="#f59e0b" name="Low Stock" />
-          <Bar dataKey="trending_up" stackId="a" fill="#3b82f6" name="Trending Up" />
+          <YAxis
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "var(--popover)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              fontSize: "12px",
+            }}
+            cursor={{ fill: "var(--muted)" }}
+          />
+          <Legend wrapperStyle={{ fontSize: "12px" }} iconType="circle" />
+          <Bar
+            dataKey="critical"
+            stackId="a"
+            fill="oklch(0.58 0.22 25)"
+            name="Critical"
+            radius={[0, 0, 0, 0]}
+          />
+          <Bar
+            dataKey="low_stock"
+            stackId="a"
+            fill="var(--chart-3)"
+            name="Low Stock"
+          />
+          <Bar
+            dataKey="trending_up"
+            stackId="a"
+            fill="var(--chart-1)"
+            name="Trending Up"
+            radius={[4, 4, 0, 0]}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

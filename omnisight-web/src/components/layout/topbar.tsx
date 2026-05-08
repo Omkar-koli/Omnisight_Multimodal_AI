@@ -12,42 +12,36 @@ export async function Topbar({ mobileNav }: { mobileNav?: ReactNode }) {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/95 backdrop-blur-sm px-4 md:px-6">
-      {/* Mobile hamburger slot */}
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/90 backdrop-blur-sm px-4 md:px-6">
       {mobileNav}
 
-      {/* Title block */}
       <div className="flex-1 min-w-0">
-        <h1 className="truncate text-sm font-semibold text-foreground leading-tight">
-          Enterprise Inventory Intelligence
+        <h1 className="truncate text-sm font-semibold leading-tight text-foreground">
+          Inventory Decision Workspace
         </h1>
-        <p className="hidden text-xs text-muted-foreground sm:block leading-tight mt-0.5">
-          Multimodal restocking decisions powered by rules, retrieval, and AI
+        <p className="hidden mt-0.5 text-xs leading-tight text-muted-foreground sm:block">
+          Multimodal restocking signals · rules + retrieval + AI
         </p>
       </div>
 
-      {/* Right slot */}
       <div className="flex items-center gap-3">
-        {/* Status indicator */}
-        <div className="hidden items-center gap-1.5 rounded-full border bg-emerald-50 px-2.5 py-1 sm:flex dark:bg-emerald-950/30">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 pulse-dot" />
-          <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+        <div className="hidden items-center gap-1.5 rounded-full border border-primary/30 bg-primary/8 px-2.5 py-1 sm:flex">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary pulse-dot" />
+          <span className="text-[10px] font-medium uppercase tracking-wider text-primary">
             Live
           </span>
         </div>
 
-        {/* User info */}
         <div className="hidden text-right sm:block">
-          <div className="text-xs font-semibold text-foreground leading-tight">
+          <div className="text-xs font-semibold leading-tight text-foreground">
             {session?.user?.name ?? "Unknown User"}
           </div>
-          <div className="text-[10px] text-muted-foreground leading-tight capitalize">
+          <div className="text-[10px] uppercase tracking-wider leading-tight text-muted-foreground">
             {session?.user?.role ?? "viewer"}
           </div>
         </div>
 
-        {/* Avatar */}
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background text-xs font-semibold">
           {initials}
         </div>
 

@@ -24,43 +24,61 @@ export function StockThresholdLineChart({
 }) {
   if (!data.length) {
     return (
-      <div className="text-sm text-muted-foreground">
+      <div className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
         No stock/threshold chart data available.
       </div>
     );
   }
 
   return (
-    <div className="h-[340px] w-full">
+    <div className="h-[320px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}
-          margin={{ top: 12, right: 16, left: 0, bottom: 16 }}
+          margin={{ top: 8, right: 12, left: -8, bottom: 20 }}
         >
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="var(--border)"
+            vertical={false}
+          />
           <XAxis
             dataKey="name"
             angle={-20}
             textAnchor="end"
-            height={70}
+            height={64}
             interval={0}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
           />
-          <YAxis />
-          <Tooltip />
-          <Legend />
+          <YAxis
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "var(--popover)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              fontSize: "12px",
+            }}
+          />
+          <Legend wrapperStyle={{ fontSize: "12px" }} iconType="circle" />
           <Line
             type="monotone"
             dataKey="current_quantity"
-            stroke="#10b981"
-            strokeWidth={2}
-            dot={false}
+            stroke="var(--chart-1)"
+            strokeWidth={2.5}
+            dot={{ r: 3, fill: "var(--chart-1)" }}
+            activeDot={{ r: 5 }}
             name="Current Stock"
           />
           <Line
             type="monotone"
             dataKey="threshold_units"
-            stroke="#ef4444"
+            stroke="var(--chart-2)"
             strokeWidth={2}
+            strokeDasharray="5 4"
             dot={false}
             name="Threshold"
           />
