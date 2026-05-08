@@ -3,41 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getDecision, getProductAnalysis } from "@/lib/api";
-import { DecisionResponse } from "@/lib/types";
+import type { DecisionResponse, ProductAnalysisResponse } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ReviewPanel } from "@/components/dashboard/review-panel";
-
-type ProductAnalysisResponse = {
-  product_id: string;
-  title: string;
-  category_slug?: string;
-  category_label?: string;
-
-  trend_classification: "Trending Up" | "Trending Down" | "Stable";
-  trend_conflict?: boolean;
-  trend_summary?: string;
-
-  projected_weekly_demand?: number;
-  threshold_units?: number;
-  threshold_explanation?: string;
-
-  current_quantity?: number;
-  stock_flag: "CRITICAL" | "LOW STOCK" | "SUFFICIENT" | "OVERSTOCK";
-  units_short?: number;
-
-  recommended_order_qty?: number;
-  order_recommendation?: string;
-
-  confidence_pct?: number;
-  confidence_notes?: string;
-  manual_review_required?: boolean;
-
-  executive_summary?: string;
-
-  urgency_rank_score?: number;
-  destination_view?: "dashboard" | "monitoring";
-};
 
 function stockFlagClasses(flag: string) {
   if (flag === "CRITICAL") {
@@ -47,8 +16,8 @@ function stockFlagClasses(flag: string) {
     return "bg-amber-100 text-amber-800 border border-amber-200";
   }
   if (flag === "OVERSTOCK") {
-  return "bg-purple-100 text-purple-800 border border-purple-200";
-}
+    return "bg-purple-100 text-purple-800 border border-purple-200";
+  }
   return "bg-emerald-100 text-emerald-800 border border-emerald-200";
 }
 
@@ -87,6 +56,157 @@ function llmActionClasses(action: string) {
   return "bg-blue-100 text-blue-800 border border-blue-200";
 }
 
+function trendReasonBadgeClasses(confidence: string) {
+  if (confidence === "high") {
+    return "bg-emerald-100 text-emerald-800 border border-emerald-200";
+  }
+  if (confidence === "moderate") {
+    return "bg-amber-100 text-amber-800 border border-amber-200";
+  }
+  return "bg-zinc-100 text-zinc-800 border border-zinc-200";
+}
+
+function MetricBox({
+  label,
+  value,
+  valueClassName = "",
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader>
+        <CardTitle>{label}</CardTitle>
+      </CardHeader>
+      <CardContent className={`text-2xl font-semibold ${valueClassName}`}>
+        {value}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BulletList({
+  items,
+  emptyText,
+}: {
+  items: string[];
+  emptyText: string;
+}) {
+  if (!items.length) {
+    return <div className="text-sm text-muted-foreground">{emptyText}</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.map((item, idx) => (
+        <div key={idx} className="text-sm text-muted-foreground">
+          • {item}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TrendReasonBlock({ analysis }: { analysis: ProductAnalysisResponse }) {
+  const isTrendingUp = analysis.trend_classification === "Trending Up";
+  const keywords = analysis.trend_keywords ?? [];
+  const reasons = analysis.trend_reasons ?? [];
+  const reasonConfidence = analysis.trend_reason_confidence ?? "not_applicable";
+
+  if (!isTrendingUp) {
+    return (
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle>Trend Analysis</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="text-sm">
+            <span className="font-medium">Classification: </span>
+            {analysis.trend_classification}
+          </div>
+          {analysis.trend_conflict ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Trend and review signals conflict. Treat this result with caution.
+            </div>
+          ) : null}
+          <div className="text-sm text-muted-foreground">
+            {analysis.trend_summary || "No trend summary available."}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader>
+        <CardTitle>Why It’s Trending</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">Classification:</span>
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${trendClasses(
+              analysis.trend_classification
+            )}`}
+          >
+            {analysis.trend_classification}
+          </span>
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${trendReasonBadgeClasses(
+              reasonConfidence
+            )}`}
+          >
+            {reasonConfidence.replaceAll("_", " ")} confidence
+          </span>
+        </div>
+
+        {analysis.trend_conflict ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Trend and review signals conflict. Treat this trend explanation with caution.
+          </div>
+        ) : null}
+
+        <div>
+          <div className="mb-2 text-sm font-medium">Top Search / Review Keywords</div>
+          {keywords.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {keywords.slice(0, 5).map((keyword, idx) => (
+                <span
+                  key={`${keyword}-${idx}`}
+                  className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                >
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              No strong keyword evidence is available.
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="mb-2 text-sm font-medium">Top Reasons</div>
+          <BulletList
+            items={reasons.slice(0, 3)}
+            emptyText="Recent reviews are too few or too old to explain the trend reliably."
+          />
+        </div>
+
+        {analysis.trend_summary ? (
+          <div className="rounded-xl border bg-muted/20 p-3 text-sm text-muted-foreground">
+            {analysis.trend_summary}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ProductDecisionPage() {
   const params = useParams<{ productId: string }>();
   const productId = params.productId;
@@ -100,10 +220,7 @@ export default function ProductDecisionPage() {
     if (!productId) return;
 
     setLoading(true);
-    Promise.all([
-      getDecision(productId),
-      getProductAnalysis(productId),
-    ])
+    Promise.all([getDecision(productId), getProductAnalysis(productId)])
       .then(([decisionRes, analysisRes]) => {
         setDecision(decisionRes);
         setAnalysis(analysisRes);
@@ -126,113 +243,84 @@ export default function ProductDecisionPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stockFlagClasses(
-              analysis.stock_flag
-            )}`}
-          >
-            {analysis.stock_flag}
-          </span>
+      <Card className="rounded-3xl">
+        <CardContent className="p-6">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stockFlagClasses(
+                  analysis.stock_flag
+                )}`}
+              >
+                {analysis.stock_flag}
+              </span>
 
-          <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${trendClasses(
-              analysis.trend_classification
-            )}`}
-          >
-            {analysis.trend_classification}
-          </span>
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${trendClasses(
+                  analysis.trend_classification
+                )}`}
+              >
+                {analysis.trend_classification}
+              </span>
 
-          {analysis.manual_review_required ? (
-            <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
-              Manual Review Required
-            </span>
-          ) : null}
+              {analysis.manual_review_required ? (
+                <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+                  Manual Review Required
+                </span>
+              ) : null}
 
-          {analysis.destination_view ? (
-            <span className="inline-flex rounded-full border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-              {analysis.destination_view === "dashboard" ? "Dashboard" : "Monitoring"}
-            </span>
-          ) : null}
-        </div>
+              {analysis.destination_view ? (
+                <span className="inline-flex rounded-full border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                  {analysis.destination_view === "dashboard"
+                    ? "Dashboard"
+                    : "Monitoring"}
+                </span>
+              ) : null}
+            </div>
 
-        <div>
-          <h2 className="text-2xl font-semibold">{analysis.title}</h2>
-          <p className="text-sm text-muted-foreground">{analysis.product_id}</p>
-          <p className="text-sm text-muted-foreground">
-            {analysis.category_label || analysis.category_slug || "Unknown Category"}
-          </p>
-        </div>
-      </div>
+            <div>
+              <h2 className="text-2xl font-semibold">{analysis.title}</h2>
+              <p className="text-sm text-muted-foreground">{analysis.product_id}</p>
+              <p className="text-sm text-muted-foreground">
+                {analysis.category_label ||
+                  analysis.category_slug ||
+                  "Unknown Category"}
+              </p>
+            </div>
+
+            <div className="text-sm text-muted-foreground">
+              {analysis.executive_summary || "No executive summary available."}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Current Quantity</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {Number(analysis.current_quantity ?? 0).toFixed(0)}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Dynamic Threshold</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {Number(analysis.threshold_units ?? 0).toFixed(0)}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Projected Weekly Demand</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {Number(analysis.projected_weekly_demand ?? 0).toFixed(1)}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Recommended Order Qty</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {Number(analysis.recommended_order_qty ?? 0).toFixed(0)}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Confidence</CardTitle>
-          </CardHeader>
-          <CardContent className={`text-2xl font-semibold ${confidenceClasses(confidencePct)}`}>
-            {confidencePct.toFixed(0)}%
-          </CardContent>
-        </Card>
+        <MetricBox
+          label="Current Quantity"
+          value={Number(analysis.current_quantity ?? 0).toFixed(0)}
+        />
+        <MetricBox
+          label="Dynamic Threshold"
+          value={Number(analysis.threshold_units ?? 0).toFixed(0)}
+        />
+        <MetricBox
+          label="Projected Weekly Demand"
+          value={Number(analysis.projected_weekly_demand ?? 0).toFixed(1)}
+        />
+        <MetricBox
+          label="Recommended Order Qty"
+          value={Number(analysis.recommended_order_qty ?? 0).toFixed(0)}
+        />
+        <MetricBox
+          label="Confidence"
+          value={`${confidencePct.toFixed(0)}%`}
+          valueClassName={confidenceClasses(confidencePct)}
+        />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Trend Analysis</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-sm">
-              <span className="font-medium">Classification: </span>
-              {analysis.trend_classification}
-            </div>
-            {analysis.trend_conflict ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Trend and review signals conflict. Treat this result with caution.
-              </div>
-            ) : null}
-            <div className="text-sm text-muted-foreground">
-              {analysis.trend_summary || "No trend summary available."}
-            </div>
-          </CardContent>
-        </Card>
+        <TrendReasonBlock analysis={analysis} />
 
         <Card className="rounded-2xl">
           <CardHeader>
@@ -248,7 +336,8 @@ export default function ProductDecisionPage() {
               {Number(analysis.units_short ?? 0).toFixed(0)}
             </div>
             <div className="text-sm text-muted-foreground">
-              {analysis.threshold_explanation || "No threshold explanation available."}
+              {analysis.threshold_explanation ||
+                "No threshold explanation available."}
             </div>
           </CardContent>
         </Card>
@@ -261,21 +350,15 @@ export default function ProductDecisionPage() {
         <CardContent className="space-y-3">
           <div className="text-base font-medium">
             {Number(analysis.recommended_order_qty ?? 0) > 0
-              ? `Order approximately ${Number(analysis.recommended_order_qty ?? 0).toFixed(0)} units`
+              ? `Order approximately ${Number(
+                  analysis.recommended_order_qty ?? 0
+                ).toFixed(0)} units`
               : "Do not restock yet"}
           </div>
           <div className="text-sm text-muted-foreground">
-            {analysis.order_recommendation || "No order recommendation explanation available."}
+            {analysis.order_recommendation ||
+              "No order recommendation explanation available."}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle>Executive Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          {analysis.executive_summary || "No executive summary available."}
         </CardContent>
       </Card>
 
@@ -284,7 +367,9 @@ export default function ProductDecisionPage() {
           <CardTitle>Confidence Notes</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className={`text-base font-medium ${confidenceClasses(confidencePct)}`}>
+          <div
+            className={`text-base font-medium ${confidenceClasses(confidencePct)}`}
+          >
             Analysis Confidence: {confidencePct.toFixed(0)}%
           </div>
           <div className="text-sm text-muted-foreground">
@@ -292,7 +377,8 @@ export default function ProductDecisionPage() {
           </div>
           {analysis.manual_review_required ? (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              Confidence is below the safety threshold. Manual review is required before acting.
+              Confidence is below the safety threshold. Manual review is required
+              before acting.
             </div>
           ) : null}
         </CardContent>
@@ -348,12 +434,11 @@ export default function ProductDecisionPage() {
               <CardHeader>
                 <CardTitle>Key Risks</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {llm.key_risks.length > 0 ? (
-                  llm.key_risks.map((item, idx) => <div key={idx}>- {item}</div>)
-                ) : (
-                  <div className="text-sm text-muted-foreground">No key risks returned.</div>
-                )}
+              <CardContent>
+                <BulletList
+                  items={llm.key_risks}
+                  emptyText="No key risks returned."
+                />
               </CardContent>
             </Card>
 
@@ -361,12 +446,11 @@ export default function ProductDecisionPage() {
               <CardHeader>
                 <CardTitle>Key Opportunities</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {llm.key_opportunities.length > 0 ? (
-                  llm.key_opportunities.map((item, idx) => <div key={idx}>- {item}</div>)
-                ) : (
-                  <div className="text-sm text-muted-foreground">No key opportunities returned.</div>
-                )}
+              <CardContent>
+                <BulletList
+                  items={llm.key_opportunities}
+                  emptyText="No key opportunities returned."
+                />
               </CardContent>
             </Card>
           </div>
@@ -376,12 +460,11 @@ export default function ProductDecisionPage() {
               <CardHeader>
                 <CardTitle>Caution Flags</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {llm.caution_flags.length > 0 ? (
-                  llm.caution_flags.map((item, idx) => <div key={idx}>- {item}</div>)
-                ) : (
-                  <div className="text-sm text-muted-foreground">No caution flags returned.</div>
-                )}
+              <CardContent>
+                <BulletList
+                  items={llm.caution_flags}
+                  emptyText="No caution flags returned."
+                />
               </CardContent>
             </Card>
 
@@ -389,12 +472,11 @@ export default function ProductDecisionPage() {
               <CardHeader>
                 <CardTitle>Follow-up Actions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {llm.follow_up_actions.length > 0 ? (
-                  llm.follow_up_actions.map((item, idx) => <div key={idx}>- {item}</div>)
-                ) : (
-                  <div className="text-sm text-muted-foreground">No follow-up actions returned.</div>
-                )}
+              <CardContent>
+                <BulletList
+                  items={llm.follow_up_actions}
+                  emptyText="No follow-up actions returned."
+                />
               </CardContent>
             </Card>
           </div>
@@ -414,7 +496,9 @@ export default function ProductDecisionPage() {
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-muted-foreground">No supporting evidence returned.</div>
+                <div className="text-sm text-muted-foreground">
+                  No supporting evidence returned.
+                </div>
               )}
             </CardContent>
           </Card>

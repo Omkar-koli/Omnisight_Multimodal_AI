@@ -199,6 +199,9 @@ export type Top5ProductItem = {
   recommended_order_qty?: number;
   confidence_pct?: number;
   executive_summary?: string;
+  trend_keywords?: string[];
+  trend_reasons?: string[];
+  trend_reason_confidence?: string;
 };
 
 export type Top5ProductListResponse = {
@@ -235,6 +238,9 @@ export type ProductAnalysisResponse = {
   trend_classification: "Trending Up" | "Trending Down" | "Stable";
   trend_conflict?: boolean;
   trend_summary?: string;
+  trend_keywords?: string[];
+  trend_reasons?: string[];
+  trend_reason_confidence?: string;
 
   projected_weekly_demand?: number;
   threshold_units?: number;

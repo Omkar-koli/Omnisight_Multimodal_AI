@@ -993,6 +993,32 @@ def build_trending_next_context() -> dict:
     }
 
 
+def normalize_str_list(value) -> list[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    if isinstance(value, tuple):
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    if hasattr(value, "tolist"):
+        raw = value.tolist()
+        if isinstance(raw, list):
+            return [str(v).strip() for v in raw if str(v).strip()]
+        raw = str(raw).strip()
+        return [raw] if raw else []
+
+    try:
+        if pd.isna(value):
+            return []
+    except Exception:
+        pass
+
+    text = str(value).strip()
+    return [text] if text else []
+
 @router.get("/", tags=["system"])
 async def root():
     return {"message": "OmniSight API is running"}
@@ -1033,8 +1059,8 @@ async def get_dashboard_top5() -> Top5ProductListResponse:
             recommended_order_qty=safe_float(row.get("recommended_order_qty", 0.0)),
             confidence_pct=safe_float(row.get("confidence_pct", 0.0)),
             executive_summary=str(row.get("executive_summary", "")),
-            trend_keywords=list(row.get("trend_keywords", []) or []),
-            trend_reasons=list(row.get("trend_reasons", []) or []),
+            trend_keywords=normalize_str_list(row.get("trend_keywords")),
+            trend_reasons=normalize_str_list(row.get("trend_reasons")),
             trend_reason_confidence=str(row.get("trend_reason_confidence", "not_applicable")),
         )
         for _, row in df.iterrows()
@@ -1115,8 +1141,8 @@ async def get_product_analysis(product_id: str) -> ProductAnalysisResponse:
         trend_classification=str(row.get("trend_classification", "Stable")),
         trend_conflict=bool(row.get("trend_conflict", False)),
         trend_summary=str(row.get("trend_summary", "")),
-        trend_keywords=list(row.get("trend_keywords", []) or []),
-        trend_reasons=list(row.get("trend_reasons", []) or []),
+        trend_keywords=normalize_str_list(row.get("trend_keywords")),   
+        trend_reasons=normalize_str_list(row.get("trend_reasons")),
         trend_reason_confidence=str(row.get("trend_reason_confidence", "not_applicable")),
         projected_weekly_demand=safe_float(row.get("projected_weekly_demand", 0.0)),
         threshold_units=safe_float(row.get("threshold_units", 0.0)),
