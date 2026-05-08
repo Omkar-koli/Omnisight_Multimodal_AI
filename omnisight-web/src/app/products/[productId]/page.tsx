@@ -1,0 +1,427 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { getDecision, getProductAnalysis } from "@/lib/api";
+import { DecisionResponse } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ReviewPanel } from "@/components/dashboard/review-panel";
+
+type ProductAnalysisResponse = {
+  product_id: string;
+  title: string;
+  category_slug?: string;
+  category_label?: string;
+
+  trend_classification: "Trending Up" | "Trending Down" | "Stable";
+  trend_conflict?: boolean;
+  trend_summary?: string;
+
+  projected_weekly_demand?: number;
+  threshold_units?: number;
+  threshold_explanation?: string;
+
+  current_quantity?: number;
+  stock_flag: "CRITICAL" | "LOW STOCK" | "SUFFICIENT" | "OVERSTOCK";
+  units_short?: number;
+
+  recommended_order_qty?: number;
+  order_recommendation?: string;
+
+  confidence_pct?: number;
+  confidence_notes?: string;
+  manual_review_required?: boolean;
+
+  executive_summary?: string;
+
+  urgency_rank_score?: number;
+  destination_view?: "dashboard" | "monitoring";
+};
+
+function stockFlagClasses(flag: string) {
+  if (flag === "CRITICAL") {
+    return "bg-red-100 text-red-800 border border-red-200";
+  }
+  if (flag === "LOW STOCK") {
+    return "bg-amber-100 text-amber-800 border border-amber-200";
+  }
+  if (flag === "OVERSTOCK") {
+  return "bg-purple-100 text-purple-800 border border-purple-200";
+}
+  return "bg-emerald-100 text-emerald-800 border border-emerald-200";
+}
+
+function trendClasses(trend: string) {
+  if (trend === "Trending Up") {
+    return "bg-blue-100 text-blue-800 border border-blue-200";
+  }
+  if (trend === "Trending Down") {
+    return "bg-slate-100 text-slate-800 border border-slate-200";
+  }
+  return "bg-zinc-100 text-zinc-800 border border-zinc-200";
+}
+
+function confidenceClasses(confidence: number) {
+  if (confidence < 40) return "text-red-700";
+  if (confidence < 70) return "text-amber-700";
+  return "text-emerald-700";
+}
+
+function llmActionClasses(action: string) {
+  if (action === "RESTOCK_NOW") {
+    return "bg-red-100 text-red-800 border border-red-200";
+  }
+  if (action === "RESTOCK_CAUTIOUSLY") {
+    return "bg-amber-100 text-amber-800 border border-amber-200";
+  }
+  if (action === "SLOW_REPLENISHMENT") {
+    return "bg-slate-100 text-slate-800 border border-slate-200";
+  }
+  if (action === "CHECK_QUALITY_BEFORE_RESTOCK") {
+    return "bg-purple-100 text-purple-800 border border-purple-200";
+  }
+  if (action === "HOLD") {
+    return "bg-zinc-100 text-zinc-800 border border-zinc-200";
+  }
+  return "bg-blue-100 text-blue-800 border border-blue-200";
+}
+
+export default function ProductDecisionPage() {
+  const params = useParams<{ productId: string }>();
+  const productId = params.productId;
+
+  const [decision, setDecision] = useState<DecisionResponse | null>(null);
+  const [analysis, setAnalysis] = useState<ProductAnalysisResponse | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!productId) return;
+
+    setLoading(true);
+    Promise.all([
+      getDecision(productId),
+      getProductAnalysis(productId),
+    ])
+      .then(([decisionRes, analysisRes]) => {
+        setDecision(decisionRes);
+        setAnalysis(analysisRes);
+        setError("");
+      })
+      .catch((err) => {
+        setError(String(err));
+      })
+      .finally(() => setLoading(false));
+  }, [productId]);
+
+  if (loading) return <div>Loading product analysis...</div>;
+  if (error) return <div className="text-red-500">{error}</div>;
+  if (!analysis) return <div>No product analysis returned.</div>;
+
+  const llm = decision;
+  const confidencePct = Number(analysis.confidence_pct ?? 0);
+  const llmConfidencePct = Number(llm?.llm_confidence ?? 0) * 100;
+  const baselineConfidencePct = Number(llm?.baseline_confidence ?? 0) * 100;
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stockFlagClasses(
+              analysis.stock_flag
+            )}`}
+          >
+            {analysis.stock_flag}
+          </span>
+
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${trendClasses(
+              analysis.trend_classification
+            )}`}
+          >
+            {analysis.trend_classification}
+          </span>
+
+          {analysis.manual_review_required ? (
+            <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+              Manual Review Required
+            </span>
+          ) : null}
+
+          {analysis.destination_view ? (
+            <span className="inline-flex rounded-full border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+              {analysis.destination_view === "dashboard" ? "Dashboard" : "Monitoring"}
+            </span>
+          ) : null}
+        </div>
+
+        <div>
+          <h2 className="text-2xl font-semibold">{analysis.title}</h2>
+          <p className="text-sm text-muted-foreground">{analysis.product_id}</p>
+          <p className="text-sm text-muted-foreground">
+            {analysis.category_label || analysis.category_slug || "Unknown Category"}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Current Quantity</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {Number(analysis.current_quantity ?? 0).toFixed(0)}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Dynamic Threshold</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {Number(analysis.threshold_units ?? 0).toFixed(0)}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Projected Weekly Demand</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {Number(analysis.projected_weekly_demand ?? 0).toFixed(1)}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Recommended Order Qty</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {Number(analysis.recommended_order_qty ?? 0).toFixed(0)}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Confidence</CardTitle>
+          </CardHeader>
+          <CardContent className={`text-2xl font-semibold ${confidenceClasses(confidencePct)}`}>
+            {confidencePct.toFixed(0)}%
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Trend Analysis</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm">
+              <span className="font-medium">Classification: </span>
+              {analysis.trend_classification}
+            </div>
+            {analysis.trend_conflict ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Trend and review signals conflict. Treat this result with caution.
+              </div>
+            ) : null}
+            <div className="text-sm text-muted-foreground">
+              {analysis.trend_summary || "No trend summary available."}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Stock Assessment</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm">
+              <span className="font-medium">Stock Flag: </span>
+              {analysis.stock_flag}
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Units Short: </span>
+              {Number(analysis.units_short ?? 0).toFixed(0)}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {analysis.threshold_explanation || "No threshold explanation available."}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle>Order Recommendation</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="text-base font-medium">
+            {Number(analysis.recommended_order_qty ?? 0) > 0
+              ? `Order approximately ${Number(analysis.recommended_order_qty ?? 0).toFixed(0)} units`
+              : "Do not restock yet"}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {analysis.order_recommendation || "No order recommendation explanation available."}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle>Executive Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          {analysis.executive_summary || "No executive summary available."}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle>Confidence Notes</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className={`text-base font-medium ${confidenceClasses(confidencePct)}`}>
+            Analysis Confidence: {confidencePct.toFixed(0)}%
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {analysis.confidence_notes || "No confidence notes available."}
+          </div>
+          {analysis.manual_review_required ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              Confidence is below the safety threshold. Manual review is required before acting.
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {llm ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle>Baseline Action</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Badge variant="outline">{llm.baseline_action}</Badge>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle>Baseline Confidence</CardTitle>
+              </CardHeader>
+              <CardContent>{baselineConfidencePct.toFixed(0)}%</CardContent>
+            </Card>
+
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle>LLM Action</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Badge className={llmActionClasses(llm.llm_final_action)}>
+                  {llm.llm_final_action}
+                </Badge>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle>LLM Confidence</CardTitle>
+              </CardHeader>
+              <CardContent>{llmConfidencePct.toFixed(0)}%</CardContent>
+            </Card>
+          </div>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle>LLM Reasoning Summary</CardTitle>
+            </CardHeader>
+            <CardContent>{llm.reasoning_summary}</CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle>Key Risks</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {llm.key_risks.length > 0 ? (
+                  llm.key_risks.map((item, idx) => <div key={idx}>- {item}</div>)
+                ) : (
+                  <div className="text-sm text-muted-foreground">No key risks returned.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle>Key Opportunities</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {llm.key_opportunities.length > 0 ? (
+                  llm.key_opportunities.map((item, idx) => <div key={idx}>- {item}</div>)
+                ) : (
+                  <div className="text-sm text-muted-foreground">No key opportunities returned.</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle>Caution Flags</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {llm.caution_flags.length > 0 ? (
+                  llm.caution_flags.map((item, idx) => <div key={idx}>- {item}</div>)
+                ) : (
+                  <div className="text-sm text-muted-foreground">No caution flags returned.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle>Follow-up Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {llm.follow_up_actions.length > 0 ? (
+                  llm.follow_up_actions.map((item, idx) => <div key={idx}>- {item}</div>)
+                ) : (
+                  <div className="text-sm text-muted-foreground">No follow-up actions returned.</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle>Supporting Evidence</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {llm.supporting_evidence.length > 0 ? (
+                llm.supporting_evidence.map((item, idx) => (
+                  <div key={idx} className="rounded-xl border p-3">
+                    <div className="mb-1 text-sm font-medium uppercase text-muted-foreground">
+                      {item.source}
+                    </div>
+                    <div>{item.summary}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-muted-foreground">No supporting evidence returned.</div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+
+      <ReviewPanel productId={productId} />
+    </div>
+  );
+}
