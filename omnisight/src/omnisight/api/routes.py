@@ -1033,6 +1033,9 @@ async def get_dashboard_top5() -> Top5ProductListResponse:
             recommended_order_qty=safe_float(row.get("recommended_order_qty", 0.0)),
             confidence_pct=safe_float(row.get("confidence_pct", 0.0)),
             executive_summary=str(row.get("executive_summary", "")),
+            trend_keywords=list(row.get("trend_keywords", []) or []),
+            trend_reasons=list(row.get("trend_reasons", []) or []),
+            trend_reason_confidence=str(row.get("trend_reason_confidence", "not_applicable")),
         )
         for _, row in df.iterrows()
     ]
@@ -1112,6 +1115,9 @@ async def get_product_analysis(product_id: str) -> ProductAnalysisResponse:
         trend_classification=str(row.get("trend_classification", "Stable")),
         trend_conflict=bool(row.get("trend_conflict", False)),
         trend_summary=str(row.get("trend_summary", "")),
+        trend_keywords=list(row.get("trend_keywords", []) or []),
+        trend_reasons=list(row.get("trend_reasons", []) or []),
+        trend_reason_confidence=str(row.get("trend_reason_confidence", "not_applicable")),
         projected_weekly_demand=safe_float(row.get("projected_weekly_demand", 0.0)),
         threshold_units=safe_float(row.get("threshold_units", 0.0)),
         threshold_explanation=str(row.get("threshold_explanation", "")),
